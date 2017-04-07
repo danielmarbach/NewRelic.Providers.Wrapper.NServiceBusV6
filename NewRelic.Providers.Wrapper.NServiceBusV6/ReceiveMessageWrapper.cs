@@ -12,10 +12,9 @@ namespace NewRelic.Providers.Wrapper.NServiceBusV6
         public CanWrapResponse CanWrap(InstrumentedMethodInfo methodInfo)
         {
             return new CanWrapResponse(
-                MethodExtensions.MatchesAny((Method) methodInfo.Method, "NServiceBus.Core",
+                methodInfo.Method.MatchesAny("NServiceBus.Core",
                     "NServiceBus.LoadHandlersConnector", "Invoke",
-                    "NServiceBus.Pipeline.IIncomingLogicalMessageContext,System.Func`2[NServiceBus.Pipeline.IInvokeHandlerContext,System.Threading.Tasks.Task]"),
-                (string) null);
+                    "NServiceBus.Pipeline.IIncomingLogicalMessageContext,System.Func`2[NServiceBus.Pipeline.IInvokeHandlerContext,System.Threading.Tasks.Task]"));
         }
 
         public AfterWrappedMethodDelegate BeforeWrappedMethod(InstrumentedMethodCall instrumentedMethodCall,
@@ -26,16 +25,14 @@ namespace NewRelic.Providers.Wrapper.NServiceBusV6
             var incomingLogicalMessage = context.Message;
             if (incomingLogicalMessage == null)
                 throw new NullReferenceException("logicalMessage");
-            Dictionary<string, string> headers = context.Headers;
+            var headers = context.Headers;
             if (headers == null)
                 throw new NullReferenceException("headers");
-            string queueName = TryGetQueueName(incomingLogicalMessage);
+            var queueName = TryGetQueueName(incomingLogicalMessage);
             agentWrapperApi.CreateMessageBrokerTransaction(0, "NServiceBus", queueName);
-            ISegment isegment = agentWrapperApi.StartMessageBrokerSegment(instrumentedMethodCall.MethodCall, 0,
+            var isegment = agentWrapperApi.StartMessageBrokerSegment(instrumentedMethodCall.MethodCall, 0,
                 (MessageBrokerAction) 1, "NServiceBus", queueName);
-            agentWrapperApi.ProcessInboundRequest(headers,
-                new int?());
-
+            agentWrapperApi.ProcessInboundRequest(headers);
             return Delegates.GetDelegateFor(() =>
             {
                 agentWrapperApi.EndSegment(isegment);

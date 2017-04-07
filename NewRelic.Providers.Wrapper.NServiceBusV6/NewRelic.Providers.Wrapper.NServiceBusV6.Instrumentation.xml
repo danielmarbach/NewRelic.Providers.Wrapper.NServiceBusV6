@@ -6,5 +6,10 @@
 				<exactMethodMatcher methodName="Invoke" parameters="NServiceBus.Pipeline.IIncomingLogicalMessageContext,System.Func`2[NServiceBus.Pipeline.IInvokeHandlerContext,System.Threading.Tasks.Task]" />
 			</match>
 		</tracerFactory>
+	  <tracerFactory>
+	    <match assemblyName="NServiceBus.Core" className="NServiceBus.Pipeline`1[NServiceBus.Pipeline.IOutgoingSendContext]">
+	      <exactMethodMatcher methodName="Invoke" parameters="NServiceBus.Pipeline.IOutgoingSendContext" />
+	    </match>
+	  </tracerFactory>    
 	</instrumentation>
 </extension>
