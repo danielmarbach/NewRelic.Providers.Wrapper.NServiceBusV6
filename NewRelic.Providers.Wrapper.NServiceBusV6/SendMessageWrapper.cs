@@ -1,4 +1,6 @@
-﻿using NewRelic.Agent.Extensions.Providers.Wrapper;
+﻿using System.Threading;
+using System.Threading.Tasks;
+using NewRelic.Agent.Extensions.Providers.Wrapper;
 using NewRelic.SystemExtensions;
 using NServiceBus.Pipeline;
 
@@ -17,7 +19,28 @@ namespace NewRelic.Providers.Wrapper.NServiceBusV6
             AttachCatHeaders(agentWrapperApi, context);
             var queueName = TryGetQueueName(context.Message);
             var segment = agentWrapperApi.StartMessageBrokerSegment(instrumentedMethodCall.MethodCall, MessageBrokerDestinationType.Queue, MessageBrokerAction.Produce, "NServiceBus", queueName);
-            return Delegates.GetDelegateFor(() => agentWrapperApi.EndSegment(segment));
+
+            return Delegates.GetDelegateFor<Task>(null, task =>
+            {
+                agentWrapperApi.RemoveSegmentFromCallStack(segment);
+                if (task == null)
+                    return;
+                if (SynchronizationContext.Current != null)
+                    task.ContinueWith(responseTask => agentWrapperApi.HandleExceptions(() =>
+                    {
+                        agentWrapperApi.EndSegment(segment);
+                    }), TaskScheduler.FromCurrentSynchronizationContext());
+                else
+                    task.ContinueWith(responseTask => agentWrapperApi.HandleExceptions(() =>
+                    {
+                        agentWrapperApi.EndSegment(segment);
+                    }), TaskContinuationOptions.ExecuteSynchronously);
+            }, ex =>
+            {
+                if (ex != null)
+                    agentWrapperApi.NoticeError(ex);
+                agentWrapperApi.EndSegment(segment);
+            });
         }
 
         private static void AttachCatHeaders(IAgentWrapperApi agentWrapperApi, IOutgoingContext context)

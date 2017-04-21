@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using NewRelic.Agent.Extensions.Providers.Wrapper;
 using NewRelic.SystemExtensions;
 using NServiceBus.Pipeline;
@@ -29,15 +31,33 @@ namespace NewRelic.Providers.Wrapper.NServiceBusV6
             if (headers == null)
                 throw new NullReferenceException("headers");
             var queueName = TryGetQueueName(incomingLogicalMessage);
-            agentWrapperApi.CreateMessageBrokerTransaction(0, "NServiceBus", queueName);
-            var isegment = agentWrapperApi.StartMessageBrokerSegment(instrumentedMethodCall.MethodCall, 0,
-                (MessageBrokerAction) 1, "NServiceBus", queueName);
+            agentWrapperApi.CreateMessageBrokerTransaction(MessageBrokerDestinationType.Queue, "NServiceBus", queueName);
+            var segment = agentWrapperApi.StartMessageBrokerSegment(instrumentedMethodCall.MethodCall, MessageBrokerDestinationType.Queue, MessageBrokerAction.Peek, "NServiceBus", queueName);
             agentWrapperApi.ProcessInboundRequest(headers);
-            return Delegates.GetDelegateFor(() =>
+
+            return Delegates.GetDelegateFor<Task>(null, task =>
             {
-                agentWrapperApi.EndSegment(isegment);
-                agentWrapperApi.EndTransaction();
-            }, null, agentWrapperApi.NoticeError);
+                agentWrapperApi.RemoveSegmentFromCallStack(segment);
+                if (task == null)
+                    return;
+                if (SynchronizationContext.Current != null)
+                    task.ContinueWith(responseTask => agentWrapperApi.HandleExceptions(() =>
+                    {
+                        agentWrapperApi.EndSegment(segment);
+                        agentWrapperApi.EndTransaction();
+                    }), TaskScheduler.FromCurrentSynchronizationContext());
+                else
+                    task.ContinueWith(responseTask => agentWrapperApi.HandleExceptions(() =>
+                    {
+                        agentWrapperApi.EndSegment(segment);
+                        agentWrapperApi.EndTransaction();
+                    }), TaskContinuationOptions.ExecuteSynchronously);
+            }, ex =>
+            {
+                if (ex != null)
+                    agentWrapperApi.NoticeError(ex);
+                agentWrapperApi.EndSegment(segment);
+            });
         }
 
         private static string TryGetQueueName(LogicalMessage logicalMessage)

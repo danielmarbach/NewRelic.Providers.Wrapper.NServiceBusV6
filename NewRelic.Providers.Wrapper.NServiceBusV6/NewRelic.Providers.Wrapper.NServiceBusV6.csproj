@@ -57,10 +57,14 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReceiveMessageWrapper.cs" />
+    <Compile Include="SendMessageWrapper.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="NServiceBus.snk" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="NewRelic.Providers.Wrapper.NServiceBusV6.Instrumentation.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
